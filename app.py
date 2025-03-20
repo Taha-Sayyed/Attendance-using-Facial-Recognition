@@ -61,7 +61,7 @@ def create_user(email, password, first_name, middle_name, last_name, prn_no, pho
 #Main Page [Landing page]
 if st.session_state["page"] == "main":
     st.title("Welcome to Landing Page")
-
+    st.warning("If you already registered then Login with your Email")
     st.button("Register",on_click=lambda:navigate("Register"))
     st.button("Login",on_click=lambda:navigate("Login"))
 
@@ -108,6 +108,8 @@ elif st.session_state["page"] == "Register":
                 birth_date, parent_name, parent_phone_number
             )
             st.write(result)
+            st.session_state["page"]="main"
+            st.rerun()
 
     st.warning("Register with a valid Email ID for future updates.")
         
@@ -119,3 +121,5 @@ elif st.session_state["page"]=="Login":
 
 elif st.session_state["page"]=="home":
     st.title("Welcome to Home page")
+    
+    
