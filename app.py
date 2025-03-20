@@ -136,12 +136,10 @@ elif st.session_state["page"] == "Login":
     st.title("Welcome to Login Page")
     st.button("Back to main page", on_click=lambda: navigate("main"))
     
-    # If user is already logged in, show welcome message and Logout button
+    # If user is already logged in, redirect to home
     if st.session_state["user"]:
-        st.write(f"👋 Welcome, {st.session_state['user']['email']}")
-        if st.button("Logout"):
-            st.session_state["user"] = None  # Remove session data
-            st.rerun()  # Refresh app to update UI
+        st.session_state["page"] = "home"
+        st.rerun()
     else:
         # Login UI
         email = st.text_input("Enter Email", key="login_email")
@@ -150,14 +148,22 @@ elif st.session_state["page"] == "Login":
         if st.button("Login"):
             result = login_user(email, password)
             if "idToken" in result:
-                st.session_state["user"] = {"email": email, "idToken": result["idToken"]}  # Store session data
-                st.rerun()  # Refresh app to update UI
+                st.session_state["user"] = {"email": email, "idToken": result["idToken"]}
+                st.session_state["page"] = "home"  # Navigate to home page after login
+                st.rerun()
             else:
-                st.write("❌ Login Failed:", result.get("error", {}).get("message", "Unknown error"))
+                st.error("❌ Login Failed: " + result.get("error", {}).get("message", "Unknown error"))
 
-
-
-elif st.session_state["page"]=="home":
-    st.title("Welcome to Home page")
+# Home Page
+elif st.session_state["page"] == "home":
+    st.title("Welcome to Home Page")
     
+    # Display logged-in user's email
+    if st.session_state["user"]:
+        st.write(f"👋 Welcome, {st.session_state['user']['email']}")
     
+    # Logout Button
+    if st.button("Logout"):
+        st.session_state["user"] = None
+        st.session_state["page"] = "main"
+        st.rerun()
