@@ -164,6 +164,20 @@ elif st.session_state["page"] == "home":
     if st.session_state["user"]:
         st.write(f"👋 Welcome, {st.session_state['user']['email']}")
     
+    # Retrieve and display the logged-in user's information in the sidebar
+    if st.session_state["user"]:
+        user_email = st.session_state["user"]["email"]
+        # Query the Firestore collection for the current user by email
+        user_docs = db.collection("users").where("email", "==", user_email).stream()
+        with st.sidebar:
+            st.header("Student Profile")
+            for doc in user_docs:
+                user_info = doc.to_dict()
+                st.write(f"**Email:** {user_info.get('email', '')}")
+                st.write(f"**Name:** {user_info.get('first_name', '')} {user_info.get('middle_name', '')} {user_info.get('last_name', '')}")
+                st.write(f"PRN number: {user_info.get('prn_no', '')}")
+                # You can add more fields as needed
+
     # Logout Button
     if st.button("Logout"):
         st.session_state["user"] = None
