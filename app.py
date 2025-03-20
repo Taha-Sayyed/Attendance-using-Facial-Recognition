@@ -65,8 +65,11 @@ if st.session_state["page"] == "main":
     st.button("Register",on_click=lambda:navigate("Register"))
     st.button("Login",on_click=lambda:navigate("Login"))
 
+# Registeration Page
 elif st.session_state["page"] == "Register":
     st.title("Welcome to Registration Page")
+    st.warning("Once the registeration is done, Contact Admin to active your Facial Recognition to mark attendance")
+    st.warning("Register with a valid Email ID for future updates.")
     st.button("Back to main page", on_click=lambda: navigate("main"))
 
     # Registration form UI
@@ -111,7 +114,7 @@ elif st.session_state["page"] == "Register":
             st.session_state["page"]="main"
             st.rerun()
 
-    st.warning("Register with a valid Email ID for future updates.")
+    
         
 
 elif st.session_state["page"]=="Login":
