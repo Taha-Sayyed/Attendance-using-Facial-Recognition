@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import os
 import requests
 import json
+import time
 
 # Load API Key from .env file
 load_dotenv()
@@ -126,6 +127,7 @@ elif st.session_state["page"] == "Register":
                 birth_date, parent_name, parent_phone_number
             )
             st.write(result)
+            time.sleep(3)
             st.session_state["page"]="main"
             st.rerun()
 
@@ -167,3 +169,4 @@ elif st.session_state["page"] == "home":
         st.session_state["user"] = None
         st.session_state["page"] = "main"
         st.rerun()
+    
