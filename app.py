@@ -98,12 +98,18 @@ elif st.session_state["page"] == "Register":
 
     # 🔹 Register Button
     if st.button("Register"):
-        result = create_user(
-            email, password, first_name, middle_name, last_name, 
-            prn_no, phone_number, year_of_admission, 
-            year_of_graduation, birth_date, parent_name, parent_phone_number
-        )
-        st.write(result)
+        # Check if any field is empty
+        if not all([email, password, first_name, middle_name, last_name, prn_no, phone_number, parent_name, parent_phone_number]):
+            st.error("Error: Please fill in all the fields.")
+        else:
+            result = create_user(
+                email, password, first_name, middle_name, last_name, 
+                prn_no, phone_number, year_of_admission, year_of_graduation, 
+                birth_date, parent_name, parent_phone_number
+            )
+            st.write(result)
+
+    st.warning("Register with a valid Email ID for future updates.")
         
 
 elif st.session_state["page"]=="Login":
