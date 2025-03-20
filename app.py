@@ -2,6 +2,15 @@ import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 from datetime import date
+from dotenv import load_dotenv
+import os
+import requests
+import json
+
+# Load API Key from .env file
+load_dotenv()
+api_key = os.getenv('API_KEY')
+
 
 if "page" not in st.session_state:
     st.session_state["page"]="main"
@@ -56,6 +65,12 @@ def create_user(email, password, first_name, middle_name, last_name, prn_no, pho
     except Exception as e:
         return f"Error: {e}"
 
+# Function to authenticate user using Firebase REST API
+def login_user(email, password):
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
+    payload = {"email": email, "password": password, "returnSecureToken": True}
+    response = requests.post(url, data=json.dumps(payload))
+    return response.json()
 
 
 #Main Page [Landing page]
@@ -117,9 +132,29 @@ elif st.session_state["page"] == "Register":
     
         
 
-elif st.session_state["page"]=="Login":
+elif st.session_state["page"] == "Login":
     st.title("Welcome to Login Page")
-    st.button("Back to main page",on_click=lambda:navigate("main"))
+    st.button("Back to main page", on_click=lambda: navigate("main"))
+    
+    # If user is already logged in, show welcome message and Logout button
+    if st.session_state["user"]:
+        st.write(f"👋 Welcome, {st.session_state['user']['email']}")
+        if st.button("Logout"):
+            st.session_state["user"] = None  # Remove session data
+            st.rerun()  # Refresh app to update UI
+    else:
+        # Login UI
+        email = st.text_input("Enter Email", key="login_email")
+        password = st.text_input("Enter Password", type="password", key="login_password")
+        
+        if st.button("Login"):
+            result = login_user(email, password)
+            if "idToken" in result:
+                st.session_state["user"] = {"email": email, "idToken": result["idToken"]}  # Store session data
+                st.rerun()  # Refresh app to update UI
+            else:
+                st.write("❌ Login Failed:", result.get("error", {}).get("message", "Unknown error"))
+
 
 
 elif st.session_state["page"]=="home":
