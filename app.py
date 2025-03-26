@@ -31,7 +31,7 @@ def navigate(page):
 
 #Logic added By Taha Sayyed --------------------------------------------------------------------------
 # Firebase initialization
-cred = credentials.Certificate("firestore-key.json")
+cred = credentials.Certificate("techfusion-firestore-key.json")
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 db = firestore.client()
