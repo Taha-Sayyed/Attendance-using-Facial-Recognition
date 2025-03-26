@@ -1,4 +1,8 @@
 import streamlit as st
+from streamlit_webrtc import webrtc_streamer,VideoTransformerBase
+import cv2 as cv
+import numpy
+import av
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 from datetime import date
@@ -80,6 +84,25 @@ def login_user(email, password):
     payload = {"email": email, "password": password, "returnSecureToken": True}
     response = requests.post(url, data=json.dumps(payload))
     return response.json()
+
+# Logic added by Taha Sayyed ----------------------------------------
+# ------------------- Live Video Transformer -------------------
+
+class FaceDetectionTransformer(VideoTransformerBase):
+    def transform(self, frame: av.VideoFrame) -> np.ndarray:
+        # Get frame as numpy array in BGR format
+        img = frame.to_ndarray(format="bgr24")
+        # Convert to PIL image (RGB) for classifier input
+        pil_img = Image.fromarray(cv.cvtColor(img, cv.COLOR_BGR2RGB))
+        result = predict_person(pil_img)
+        # If result is a string (error message), overlay text on original frame
+        if isinstance(result, str):
+            cv.putText(img, result, (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            return img
+        # Otherwise, convert annotated PIL image back to BGR numpy array
+        annotated_np = cv.cvtColor(np.array(result), cv.COLOR_RGB2BGR)
+        return annotated_np
+# Logic added by Taha Sayyed ----------------------------------------
 
 
 #Main Page [Landing page]
@@ -209,7 +232,15 @@ elif st.session_state["page"] == "home":
                 except Exception as e:
                     st.error("An error occurred during processing. Please try again.")
                     st.error(str(e))
-
+        
+        # New attendance button to start live video stream
+        if st.button("Mark my attendance"):
+            st.session_state["mark_attendance_active"] = True
+        
+        if st.session_state.get("mark_attendance_active"):
+            from streamlit_webrtc import webrtc_streamer
+            st.write("Live video stream:")
+            webrtc_streamer(key="attendance", video_processor_factory=FaceDetectionTransformer)
     # Logout Button
     if st.button("Logout"):
         st.session_state["user"] = None
@@ -218,38 +249,3 @@ elif st.session_state["page"] == "home":
     
 #Logic added By Taha Sayyed --------------------------------------------------------------------------
 
-
-
-# def home():
-#     st.title("Home Page")
-#     st.write("Welcome,", st.session_state["user"])
-
-#     # Button to show image uploader
-#     if st.button("Upload the Image"):
-#         st.session_state["upload_active"] = True
-
-#     # If the user has activated image uploading, show the file uploader widget
-#     if st.session_state.get("upload_active"):
-#         uploaded_file = st.file_uploader("Choose an image file", type=["png", "jpg", "jpeg"])
-#         if uploaded_file is not None:
-#             try:
-#                 # Open the image using PIL
-#                 image = Image.open(uploaded_file)
-                
-#                 # Optionally, display the uploaded image
-#                 st.image(image, caption="Uploaded Image", use_column_width=True)
-                
-#                 # Process the image and predict the person's name using the imported classifier function.
-#                 with st.spinner("Processing image and predicting..."):
-#                     predicted_name = predict_person(image)
-                    
-#                 st.success(f"Predicted Name: {predicted_name}")
-#             except Exception as e:
-#                 st.error("An error occurred during processing. Please try again.")
-#                 st.error(str(e))
-
-# # --- Main Navigation ---
-# if st.session_state["page"] == "main":
-#     login()
-# elif st.session_state["page"] == "home":
-#     home()
