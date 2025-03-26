@@ -75,7 +75,7 @@ def predict_person(pil_image):
     image_np = np.array(pil_image)
     
     # If the image is not in RGB (e.g. grayscale), convert it
-    if image_np.ndim == 2 or image_np.shape[2] != 3:
+    if image_np.ndim == 2 or (image_np.ndim == 3 and image_np.shape[2] != 3):
         image_np = cv.cvtColor(image_np, cv.COLOR_GRAY2RGB)
     
     # Detect faces in the image
@@ -86,13 +86,15 @@ def predict_person(pil_image):
     
     test_embeddings = []
     final_predictions = []
-    threshold = 0.40  # Define threshold for classification confidence
+    face_boxes=[]
+    threshold = 0.80  # Define threshold for classification confidence
 
     # Loop over detected faces
     for face in faces:
         if face['confidence'] > 0.95:
             x, y, w, h = face['box']
             x, y = abs(x), abs(y)  # Ensure positive coordinates
+            face_boxes.append((x,y,w,h))
             # Crop the face region
             face_crop = image_np[y:y+h, x:x+w]
             # Resize the cropped face to 160x160
@@ -124,5 +126,19 @@ def predict_person(pil_image):
             final_predictions.append(predictions[i])  # Use the label from the embeddings
     print(final_predictions)
     final_predictions=inverse_transform(final_predictions)
-    # Return predictions as a comma-separated string if multiple faces were detected
-    return ", ".join(final_predictions)
+    # # Return predictions as a comma-separated string if multiple faces were detected
+    # return ", ".join(final_predictions)
+
+    #logic added by Taha Sayyed ----------------------------------
+    
+    # Draw bounding boxes and labels on the image
+    for (x, y, w, h), label in zip(face_boxes, final_predictions):
+        cv.rectangle(image_np, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        cv.putText(image_np, label, (x, y-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+    
+    annotated_image = Image.fromarray(image_np)
+    return annotated_image
+
+    #logic added by Taha Sayyed ----------------------------------
+
+
