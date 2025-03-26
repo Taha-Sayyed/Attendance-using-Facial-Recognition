@@ -8,20 +8,28 @@ import requests
 import json
 import time
 
+# Import necessary modules for image processing and prediction
+import pickle
+import numpy as np
+from PIL import Image
+
+# Import your classifier prediction function (assuming this function is defined in classifier_model_for_testing.py)
+from classifier_model_for_testing import predict_person  # This function should encapsulate all pre-processing steps as in your classifier code
+
 # Load API Key from .env file
 load_dotenv()
 api_key = os.getenv('API_KEY')
 
-
 if "page" not in st.session_state:
-    st.session_state["page"]="main"
+    st.session_state["page"] = "main"
 
 if "user" not in st.session_state:
-    st.session_state["user"]=None
+    st.session_state["user"] = None
 
 def navigate(page):
-    st.session_state["page"]=page
+    st.session_state["page"] = page
 
+#Logic added By Taha Sayyed --------------------------------------------------------------------------
 # Firebase initialization
 cred = credentials.Certificate("firestore-key.json")
 if not firebase_admin._apps:
@@ -127,9 +135,9 @@ elif st.session_state["page"] == "Register":
                 birth_date, parent_name, parent_phone_number
             )
             st.write(result)
-            time.sleep(3)
-            st.session_state["page"]="main"
-            st.rerun()
+            # time.sleep(3)
+            # st.session_state["page"]="main"
+            # st.rerun()
 
     
         
@@ -177,6 +185,30 @@ elif st.session_state["page"] == "home":
                 st.write(f"**Name:** {user_info.get('first_name', '')} {user_info.get('middle_name', '')} {user_info.get('last_name', '')}")
                 st.write(f"PRN number: {user_info.get('prn_no', '')}")
                 # You can add more fields as needed
+        
+        # Button to show image uploader
+        if st.button("Upload the Image"):
+            st.session_state["upload_active"] = True
+        
+        # If the user has activated image uploading, show the file uploader widget
+        if st.session_state.get("upload_active"):
+            uploaded_file = st.file_uploader("Choose an image file", type=["png", "jpg", "jpeg"])
+            if uploaded_file is not None:
+                try:
+                    # Open the image using PIL
+                    image = Image.open(uploaded_file)
+                    
+                    # Optionally, display the uploaded image
+                    st.image(image, caption="Uploaded Image", use_column_width=True)
+                    
+                    # Process the image and predict the person's name using the imported classifier function.
+                    with st.spinner("Processing image and predicting..."):
+                        predicted_name = predict_person(image)
+                        
+                    st.success(f"Predicted Name: {predicted_name}")
+                except Exception as e:
+                    st.error("An error occurred during processing. Please try again.")
+                    st.error(str(e))
 
     # Logout Button
     if st.button("Logout"):
@@ -184,3 +216,40 @@ elif st.session_state["page"] == "home":
         st.session_state["page"] = "main"
         st.rerun()
     
+#Logic added By Taha Sayyed --------------------------------------------------------------------------
+
+
+
+# def home():
+#     st.title("Home Page")
+#     st.write("Welcome,", st.session_state["user"])
+
+#     # Button to show image uploader
+#     if st.button("Upload the Image"):
+#         st.session_state["upload_active"] = True
+
+#     # If the user has activated image uploading, show the file uploader widget
+#     if st.session_state.get("upload_active"):
+#         uploaded_file = st.file_uploader("Choose an image file", type=["png", "jpg", "jpeg"])
+#         if uploaded_file is not None:
+#             try:
+#                 # Open the image using PIL
+#                 image = Image.open(uploaded_file)
+                
+#                 # Optionally, display the uploaded image
+#                 st.image(image, caption="Uploaded Image", use_column_width=True)
+                
+#                 # Process the image and predict the person's name using the imported classifier function.
+#                 with st.spinner("Processing image and predicting..."):
+#                     predicted_name = predict_person(image)
+                    
+#                 st.success(f"Predicted Name: {predicted_name}")
+#             except Exception as e:
+#                 st.error("An error occurred during processing. Please try again.")
+#                 st.error(str(e))
+
+# # --- Main Navigation ---
+# if st.session_state["page"] == "main":
+#     login()
+# elif st.session_state["page"] == "home":
+#     home()
