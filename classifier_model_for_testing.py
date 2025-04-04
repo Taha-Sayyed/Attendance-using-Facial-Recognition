@@ -65,12 +65,17 @@ def get_embedding(face_img):
 # ----------------------------
 # Prediction Function
 # ----------------------------
+# This variable will store the latest predictions for access by the video processor
+last_predictions = []
+
 def predict_person(pil_image):
     """
     Accepts a PIL image, detects faces using MTCNN, and for each face with confidence > 0.95,
     crops and resizes the face to 160x160, obtains its embedding, and uses the classifier model
     to predict the identity. If multiple faces are detected, returns a comma-separated string of predictions.
     """
+    global last_predictions  # Make the variable accessible
+    
     # Convert PIL image to a NumPy array (RGB format)
     image_np = np.array(pil_image)
     
@@ -82,6 +87,7 @@ def predict_person(pil_image):
     faces = detector.detect_faces(image_np)
     
     if len(faces) == 0:
+        last_predictions = ["No face detected"]
         return "No face detected"
     
     test_embeddings = []
@@ -105,6 +111,7 @@ def predict_person(pil_image):
     
     # If no face met the confidence threshold
     if not test_embeddings:
+        last_predictions = ["No high-confidence face detected"]
         return "No high-confidence face detected"
     
     # Convert list of embeddings to a NumPy array
@@ -126,10 +133,9 @@ def predict_person(pil_image):
             final_predictions.append(predictions[i])  # Use the label from the embeddings
     print(final_predictions)
     final_predictions=inverse_transform(final_predictions)
-    # # Return predictions as a comma-separated string if multiple faces were detected
-    # return ", ".join(final_predictions)
-
-    #logic added by Taha Sayyed ----------------------------------
+    
+    # Store the predictions for access by the video processor
+    last_predictions = final_predictions
     
     # Draw bounding boxes and labels on the image
     for (x, y, w, h), label in zip(face_boxes, final_predictions):
@@ -138,7 +144,5 @@ def predict_person(pil_image):
     
     annotated_image = Image.fromarray(image_np)
     return annotated_image
-
-    #logic added by Taha Sayyed ----------------------------------
 
 
