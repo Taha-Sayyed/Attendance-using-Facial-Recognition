@@ -89,18 +89,37 @@ def login_user(email, password):
 # ------------------- Live Video Transformer -------------------
 
 class FaceDetectionTransformer(VideoTransformerBase):
+    def __init__(self):
+        self.current_prediction = "No face detected"
+    
     def transform(self, frame: av.VideoFrame) -> np.ndarray:
         # Get frame as numpy array in BGR format
         img = frame.to_ndarray(format="bgr24")
         # Convert to PIL image (RGB) for classifier input
         pil_img = Image.fromarray(cv.cvtColor(img, cv.COLOR_BGR2RGB))
+        
+        # Process the image with our face recognition function
         result = predict_person(pil_img)
+        
         # If result is a string (error message), overlay text on original frame
         if isinstance(result, str):
             cv.putText(img, result, (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            self.current_prediction = result
             return img
-        # Otherwise, convert annotated PIL image back to BGR numpy array
+        
+        # Otherwise, the result is an annotated image
+        # Convert annotated PIL image back to BGR numpy array
         annotated_np = cv.cvtColor(np.array(result), cv.COLOR_RGB2BGR)
+        
+        # Import the last_predictions variable from the classifier module
+        from classifier_model_for_testing import last_predictions
+        
+        # Update our current prediction
+        if last_predictions:
+            self.current_prediction = last_predictions[0]  # Get the first prediction if multiple faces
+        else:
+            self.current_prediction = "Unknown"
+            
         return annotated_np
 # Logic added by Taha Sayyed ----------------------------------------
 
@@ -158,9 +177,9 @@ elif st.session_state["page"] == "Register":
                 birth_date, parent_name, parent_phone_number
             )
             st.write(result)
-            # time.sleep(3)
-            # st.session_state["page"]="main"
-            # st.rerun()
+            time.sleep(3)
+            st.session_state["page"]="main"
+            st.rerun()
 
     
         
@@ -234,13 +253,48 @@ elif st.session_state["page"] == "home":
                     st.error(str(e))
         
         # New attendance button to start live video stream
-        if st.button("Mark my attendance"):
+        if st.button("Mark my attendance"):     
             st.session_state["mark_attendance_active"] = True
         
         if st.session_state.get("mark_attendance_active"):
             from streamlit_webrtc import webrtc_streamer
+            
             st.write("Live video stream:")
-            webrtc_streamer(key="attendance", video_processor_factory=FaceDetectionTransformer)
+            # Create a shared variable to store the current prediction
+            if "current_face" not in st.session_state:
+                st.session_state["current_face"] = "No face detected"
+            
+            # Create the video streamer
+            webrtc_ctx = webrtc_streamer(
+                key="attendance", 
+                video_processor_factory=FaceDetectionTransformer
+            )
+            
+            # Add the submit attendance button
+            if webrtc_ctx.video_processor:
+                if st.button("Submit your attendance"):
+                    # Get the current prediction from the transformer
+                    current_prediction = webrtc_ctx.video_processor.current_prediction
+                    
+                    # Display appropriate message based on the prediction
+                    if current_prediction in ["No face detected", "Unknown"]:
+                        st.error("Either no face is detected or Unknown face is detected")
+                    else:
+                        st.success(f"{current_prediction} has marked the attendance")
+                        
+                        # Optional: Record the attendance in Firestore
+                        if st.session_state["user"]:
+                            try:
+                                # Add attendance record to Firestore
+                                attendance_data = {
+                                    "user_email": st.session_state["user"]["email"],
+                                    "name": current_prediction,
+                                    "timestamp": firestore.SERVER_TIMESTAMP
+                                }
+                                db.collection("attendance").add(attendance_data)
+                                st.info("Attendance recorded in database")
+                            except Exception as e:
+                                st.warning(f"Could not record attendance in database: {e}")
     # Logout Button
     if st.button("Logout"):
         st.session_state["user"] = None
@@ -248,4 +302,3 @@ elif st.session_state["page"] == "home":
         st.rerun()
     
 #Logic added By Taha Sayyed --------------------------------------------------------------------------
-
