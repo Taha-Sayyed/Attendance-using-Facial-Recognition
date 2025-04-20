@@ -118,6 +118,7 @@ def login_user(email, password):
 class FaceDetectionTransformer(VideoTransformerBase):
     def __init__(self):
         self.current_prediction = "No face detected"
+        self.all_predictions = []
     
     def transform(self, frame: av.VideoFrame) -> np.ndarray:
         # Get frame as numpy array in BGR format
@@ -132,6 +133,7 @@ class FaceDetectionTransformer(VideoTransformerBase):
         if isinstance(result, str):
             cv.putText(img, result, (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             self.current_prediction = result
+            self.all_predictions = []
             return img
         
         # Otherwise, the result is an annotated image
@@ -141,10 +143,12 @@ class FaceDetectionTransformer(VideoTransformerBase):
         # Import the last_predictions variable from the classifier module
         from classifier_model_for_testing import last_predictions
         
-        # Update our current prediction
+        # Update our predictions
         if last_predictions:
-            self.current_prediction = last_predictions[0]  # Get the first prediction if multiple faces
+            self.all_predictions = last_predictions  # Store all recognized faces
+            self.current_prediction = last_predictions[0] if last_predictions else "Unknown"  # Default to first face
         else:
+            self.all_predictions = []
             self.current_prediction = "Unknown"
             
         return annotated_np
@@ -446,32 +450,42 @@ elif st.session_state["page"] == "home":
                         col1, col2, col3 = st.columns([1, 2, 1])
                         with col2:
                             if st.button("Submit Attendance", use_container_width=True, type="primary"):
-                                # Get the current prediction from the transformer
-                                current_prediction = webrtc_ctx.video_processor.current_prediction
+                                # Get all predictions from the transformer
+                                all_predictions = webrtc_ctx.video_processor.all_predictions
                                 
-                                # Display appropriate message based on the prediction
-                                if current_prediction in ["No face detected", "Unknown"]:
-                                    st.error("Either no face is detected or the face is unrecognized. Please try again.")
-                                else:
-                                    st.success(f"{current_prediction} has been marked present!")
+                                # Create the full name of the logged-in user
+                                if st.session_state["user"]:
+                                    user_first_name = st.session_state["user"].get("first_name", "")
+                                    user_middle_name = st.session_state["user"].get("middle_name", "")
+                                    user_last_name = st.session_state["user"].get("last_name", "")
+                                    user_full_name = f"{user_first_name} {user_middle_name} {user_last_name}".strip()
                                     
-                                    # Record the attendance in Firestore
-                                    if st.session_state["user"]:
+                                    # Check if no faces were detected or the user's face is not among them
+                                    if not all_predictions or all_predictions[0] == "No face detected":
+                                        st.error("No face detected. Please ensure your face is clearly visible in the camera.")
+                                    elif user_full_name not in all_predictions:
+                                        st.error(f"Your face was not recognized. Only {user_full_name} can mark attendance with this account.")
+                                    else:
+                                        # User's face is recognized - mark attendance
+                                        st.success(f"{user_full_name} has been marked present!")
+                                        
                                         try:
                                             # Add attendance record to Firestore
                                             attendance_data = {
                                                 "user_email": st.session_state["user"]["email"],
-                                                "name": current_prediction,
+                                                "name": user_full_name,
                                                 "timestamp": firestore.SERVER_TIMESTAMP
                                             }
                                             db.collection("attendance").add(attendance_data)
                                             st.info("Attendance recorded successfully in the database.")
                                         except Exception as e:
                                             st.warning(f"Could not record attendance in database: {e}")
-                                    
-                                    # Reset the mark_attendance_active flag to stop the video stream
-                                    st.session_state["mark_attendance_active"] = False
-                                    st.rerun()
+                                        
+                                        # Reset the mark_attendance_active flag to stop the video stream
+                                        st.session_state["mark_attendance_active"] = False
+                                        st.rerun()
+                                else:
+                                    st.error("User information not available. Please log in again.")
                     
                     # Add a button to close the webcam
                     col1, col2, col3 = st.columns([1, 2, 1])
