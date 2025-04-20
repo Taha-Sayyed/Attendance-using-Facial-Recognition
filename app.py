@@ -333,7 +333,7 @@ elif st.session_state["page"] == "home":
             has_user_info = True
         else:
             # Query the user from Firestore by email
-            user_docs = db.collection("users").where("email", "==", user_email).limit(1).stream()
+            user_docs = db.collection("users").where(field_path="email", op_string="==", value=user_email).limit(1).stream()
             user_info = None
             for doc in user_docs:
                 user_info = doc.to_dict()
@@ -493,7 +493,7 @@ elif st.session_state["page"] == "home":
                     
                     # Create a query to get attendance records for the current user
                     # Removed the order_by to avoid requiring composite index
-                    attendance_query = db.collection("attendance").where("user_email", "==", user_email)
+                    attendance_query = db.collection("attendance").where(field_path="user_email", op_string="==", value=user_email)
                     
                     try:
                         # Execute the query

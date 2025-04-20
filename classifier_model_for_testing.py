@@ -9,7 +9,7 @@ from sklearn.preprocessing import LabelEncoder
 # ----------------------------
 # Load the Classifier Model
 # ----------------------------
-model_path = "best_model_2.pkl"  # Adjust path as necessary
+model_path = "best_model.pkl"  # Adjust path as necessary
 with open(model_path, 'rb') as f:
     model = pickle.load(f)
 print("Model loaded successfully!")
@@ -17,7 +17,7 @@ print("Model loaded successfully!")
 # ----------------------------
 # Load Embeddings from .npz File
 # ----------------------------
-embedding_file = "face_embeddig_for_8_class.npz"  # Path to your .npz file containing the embeddings
+embedding_file = "face_embeddig_for_12_class.npz"  # Path to your .npz file containing the embeddings
 embedding_data = np.load(embedding_file)
 encoder=LabelEncoder()
 
@@ -144,5 +144,4 @@ def predict_person(pil_image):
     
     annotated_image = Image.fromarray(image_np)
     return annotated_image
-
 
