@@ -5,7 +5,7 @@ import numpy
 import av
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
-from datetime import date
+from datetime import date, datetime
 from dotenv import load_dotenv
 import os
 import requests
@@ -13,6 +13,9 @@ import json
 import time
 import base64
 import io
+import pandas as pd
+import pytz
+import csv
 
 # Import necessary modules for image processing and prediction
 import pickle
@@ -185,7 +188,7 @@ if st.session_state["page"] == "main":
         st.button("Login", on_click=lambda:navigate("Login"), use_container_width=True)
         
     # Add footer
-    st.markdown("<div style='text-align: center; margin-top: 50px; color: gray;'>© 2023 SIES Graduate School of Technology</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; margin-top: 50px; color: gray;'>© 2025 SIES Graduate School of Technology</div>", unsafe_allow_html=True)
 
 # Registeration Page
 elif st.session_state["page"] == "Register":
@@ -481,10 +484,136 @@ elif st.session_state["page"] == "home":
                 st.markdown("""
                 <div style="background-color: #f0f7fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
                     <h3 style="color: #1e88e5;">Attendance History</h3>
-                    <p>View your attendance history and statistics.</p>
+                    <p>View your attendance records and download as CSV file.</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Placeholder for attendance history (can be implemented later)
-                st.info("Attendance history feature will be available soon.")
+                if st.session_state["user"]:
+                    user_email = st.session_state["user"]["email"]
+                    
+                    # Create a query to get attendance records for the current user
+                    # Removed the order_by to avoid requiring composite index
+                    attendance_query = db.collection("attendance").where("user_email", "==", user_email)
+                    
+                    try:
+                        # Execute the query
+                        attendance_docs = attendance_query.stream()
+                        
+                        # Convert to a list to check if there are any records
+                        attendance_records = []
+                        timezone = pytz.timezone('Asia/Kolkata')
+                        
+                        for doc in attendance_docs:
+                            record = doc.to_dict()
+                            # Convert Firestore timestamp to datetime
+                            if record.get('timestamp'):
+                                # The timestamp from Firestore is already a datetime-like object
+                                timestamp = record['timestamp']
+                                
+                                # Convert to regular Python datetime
+                                # DatetimeWithNanoseconds doesn't have datetime attribute,
+                                # it's already a datetime-like object
+                                dt = timestamp
+                                
+                                # Convert to local timezone
+                                local_dt = dt.astimezone(timezone)
+                                
+                                # Format day, date and time
+                                day = local_dt.strftime('%A')
+                                date_str = local_dt.strftime('%d-%m-%Y')
+                                time_str = local_dt.strftime('%I:%M:%S %p')
+                                
+                                # Add to record
+                                record['day'] = day
+                                record['date'] = date_str
+                                record['time'] = time_str
+                                record['datetime'] = local_dt
+                                
+                                # Include record only if it has valid timestamp data
+                                attendance_records.append(record)
+                            else:
+                                # Skip records without timestamps
+                                st.warning(f"Found record without timestamp data, skipping.")
+                        
+                        if attendance_records:
+                            # Sort records by timestamp (descending) in Python
+                            attendance_records.sort(key=lambda x: x.get('datetime', datetime.min), reverse=True)
+                            
+                            # Display attendance records in a nice table
+                            st.subheader("Your Attendance Records")
+                            
+                            # Convert to DataFrame for better display
+                            df = pd.DataFrame(attendance_records)
+                            
+                            # Display in a table with selected columns and formatting
+                            if 'day' in df.columns and 'date' in df.columns and 'time' in df.columns:
+                                display_df = df[['day', 'date', 'time', 'name']].rename(
+                                    columns={
+                                        'day': 'Day',
+                                        'date': 'Date',
+                                        'time': 'Time',
+                                        'name': 'Recognized As'
+                                    }
+                                )
+                                st.dataframe(display_df, use_container_width=True)
+                                
+                                # Function to convert DataFrame to CSV
+                                def convert_df_to_csv(df):
+                                    return df.to_csv(index=False).encode('utf-8')
+                                
+                                # Add CSV download button
+                                csv_data = convert_df_to_csv(display_df)
+                                
+                                st.download_button(
+                                    label="Download Attendance Records as CSV",
+                                    data=csv_data,
+                                    file_name=f"attendance_records_{datetime.now().strftime('%Y%m%d')}.csv",
+                                    mime="text/csv",
+                                    help="Download your attendance history as a CSV file",
+                                    use_container_width=True
+                                )
+                                
+                                # Display attendance statistics
+                                st.subheader("Attendance Statistics")
+                                
+                                # Calculate statistics
+                                total_records = len(df)
+                                current_month = datetime.now().month
+                                current_year = datetime.now().year
+                                
+                                # Count records for current month
+                                month_records = df[df['datetime'].dt.month == current_month]
+                                month_count = len(month_records)
+                                
+                                # Create columns for statistics display
+                                stat_col1, stat_col2 = st.columns(2)
+                                
+                                with stat_col1:
+                                    st.metric("Total Attendance Records", total_records)
+                                
+                                with stat_col2:
+                                    st.metric(f"Attendance in {datetime.now().strftime('%B %Y')}", month_count)
+                                
+                            else:
+                                st.info("Attendance records are available but missing some timestamp information.")
+                        else:
+                            st.info("You haven't marked any attendance yet.")
+                            
+                    except Exception as e:
+                        st.error(f"Error retrieving attendance records: {e}")
+                        st.exception(e)  # Display the full traceback for debugging
+                        
+                        # Show guidance about fixing the index
+                        st.info("""
+                        If you're seeing an index error, you'll need to create a composite index in Firebase.
+                        
+                        **To fix this:**
+                        1. Go to your Firebase console
+                        2. Navigate to Firestore Database > Indexes
+                        3. Add a composite index for the 'attendance' collection with fields:
+                           - user_email (Ascending)
+                           - timestamp (Descending)
+                        """)
+                else:
+                    st.error("User information not available. Please log in again.")
 #Logic added By Taha Sayyed --------------------------------------------------------------------------
