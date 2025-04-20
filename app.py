@@ -57,7 +57,7 @@ def image_to_base64(img):
 
 # Define Firebase user registration function
 def create_user(email, password, first_name, middle_name, last_name, prn_no, phone_number, 
-                year_of_admission, year_of_graduation, birth_date, parent_name, parent_phone_number, profile_image):
+                year_of_admission, year_of_graduation, birth_date, parent_name, parent_phone_number, profile_image, branch):
     if not email or not password or profile_image is None:
         return "Error: Email, password, and profile image are required."
     
@@ -90,7 +90,8 @@ def create_user(email, password, first_name, middle_name, last_name, prn_no, pho
                 "year_of_graduation": year_of_graduation,
                 "parent_name": parent_name,
                 "parent_phone_number": parent_phone_number,
-                "profile_image": profile_image_b64  # Store base64 image directly in Firestore
+                "profile_image": profile_image_b64,  # Store base64 image directly in Firestore
+                "branch": branch
             }
             db.collection("users").document(uid).set(user_doc)
             return f"Account for {email} created successfully! ✅"
@@ -171,6 +172,10 @@ elif st.session_state["page"] == "Register":
         prn_no = st.text_input("Enter PRN Number")
         phone_number = st.text_input("Enter Phone Number")
 
+        # Add Branch field with dropdown options
+        branch_options = ["CS", "EXTC", "AIML", "AIDS", "IT", "MECHANICAL"]
+        branch = st.selectbox("Select Branch", branch_options)
+
         # Create a list of years for admission/graduation
         years = list(range(2020, 2031))
         year_of_admission = st.selectbox("Select Year of Admission", years)
@@ -198,13 +203,13 @@ elif st.session_state["page"] == "Register":
         
         if submit_button:
             # Check if any field is empty including profile image
-            if not all([email, password, first_name, middle_name, last_name, prn_no, phone_number, parent_name, parent_phone_number, profile_image]):
-                st.error("Error: Please fill in all the fields including the profile image.")
+            if not all([email, password, first_name, middle_name, last_name, prn_no, phone_number, parent_name, parent_phone_number, profile_image, branch]):
+                st.error("Error: Please fill in all the fields including the profile image and branch.")
             else:
                 result = create_user(
                     email, password, first_name, middle_name, last_name, 
                     prn_no, phone_number, year_of_admission, year_of_graduation, 
-                    birth_date, parent_name, parent_phone_number, profile_image
+                    birth_date, parent_name, parent_phone_number, profile_image, branch
                 )
                 st.write(result)
                 if "successfully" in result:
@@ -320,6 +325,7 @@ elif st.session_state["page"] == "home":
                 st.markdown(f"**Email:** {user_info.get('email', '')}")
                 st.markdown(f"**PRN Number:** {user_info.get('prn_no', '')}")
                 st.markdown(f"**Batch:** {user_info.get('year_of_admission', '')}-{user_info.get('year_of_graduation', '')}")
+                st.markdown(f"**Branch:** {user_info.get('branch', '')}")
         
         # Button to show image uploader
         if st.button("Upload the Image"):
