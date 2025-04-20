@@ -11,6 +11,8 @@ import os
 import requests
 import json
 import time
+import base64
+import io
 
 # Import necessary modules for image processing and prediction
 import pickle
@@ -41,12 +43,23 @@ if not firebase_admin._apps:
 db = firestore.client()
 st.write("Firebase Initialized Successfully ✅")
 
+# Function to convert image to base64 string
+def image_to_base64(img):
+    # Ensure image is in RGB mode (not RGBA) to prevent JPEG encoding issues
+    if img.mode == 'RGBA':
+        img = img.convert('RGB')
+    
+    # Use BytesIO for in-memory file handling
+    buffered = io.BytesIO()
+    img.save(buffered, format="JPEG", quality=85)  # Reduce quality to keep size manageable
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    return img_str
 
 # Define Firebase user registration function
 def create_user(email, password, first_name, middle_name, last_name, prn_no, phone_number, 
-                year_of_admission, year_of_graduation, birth_date, parent_name, parent_phone_number):
-    if not email or not password:
-        return "Error: Email and password are required."
+                year_of_admission, year_of_graduation, birth_date, parent_name, parent_phone_number, profile_image):
+    if not email or not password or profile_image is None:
+        return "Error: Email, password, and profile image are required."
     
     try:
         # Firebase Auth only takes email & password
@@ -54,6 +67,15 @@ def create_user(email, password, first_name, middle_name, last_name, prn_no, pho
         uid = user.uid
 
         try:
+            # Process the profile image
+            image = Image.open(profile_image)
+            
+            # Resize to reduce storage size (300x300 pixels is reasonable for a profile)
+            image = image.resize((300, 300))
+            
+            # Convert image to base64 string for Firestore storage
+            profile_image_b64 = image_to_base64(image)
+            
             # Save all user details in Firestore
             user_doc = {
                 "uid": uid,
@@ -67,7 +89,8 @@ def create_user(email, password, first_name, middle_name, last_name, prn_no, pho
                 "year_of_admission": year_of_admission,
                 "year_of_graduation": year_of_graduation,
                 "parent_name": parent_name,
-                "parent_phone_number": parent_phone_number
+                "parent_phone_number": parent_phone_number,
+                "profile_image": profile_image_b64  # Store base64 image directly in Firestore
             }
             db.collection("users").document(uid).set(user_doc)
             return f"Account for {email} created successfully! ✅"
@@ -165,19 +188,23 @@ elif st.session_state["page"] == "Register":
 
         parent_name = st.text_input("Enter Parent Name")
         parent_phone_number = st.text_input("Enter Parent Phone Number")
-
+        
+        # Add profile image upload field (required)
+        st.write("Upload the Image (Required)")
+        profile_image = st.file_uploader("Choose a profile image", type=["jpg", "jpeg", "png"])
+        
         # 🔹 Register Submit Button (works with Enter key too)
         submit_button = st.form_submit_button(label="Register")
         
         if submit_button:
-            # Check if any field is empty
-            if not all([email, password, first_name, middle_name, last_name, prn_no, phone_number, parent_name, parent_phone_number]):
-                st.error("Error: Please fill in all the fields.")
+            # Check if any field is empty including profile image
+            if not all([email, password, first_name, middle_name, last_name, prn_no, phone_number, parent_name, parent_phone_number, profile_image]):
+                st.error("Error: Please fill in all the fields including the profile image.")
             else:
                 result = create_user(
                     email, password, first_name, middle_name, last_name, 
                     prn_no, phone_number, year_of_admission, year_of_graduation, 
-                    birth_date, parent_name, parent_phone_number
+                    birth_date, parent_name, parent_phone_number, profile_image
                 )
                 st.write(result)
                 if "successfully" in result:
@@ -202,7 +229,20 @@ elif st.session_state["page"] == "Login":
             if email and password:
                 result = login_user(email, password)
                 if "idToken" in result:
-                    st.session_state["user"] = {"email": email, "idToken": result["idToken"]}
+                    # Get the user ID (localId) to retrieve full user details
+                    user_id = result.get("localId", "")
+                    user_data = {"email": email, "idToken": result["idToken"]}
+                    
+                    # Retrieve complete user details from Firestore if ID is available
+                    if user_id:
+                        try:
+                            user_doc = db.collection("users").document(user_id).get()
+                            if user_doc.exists:
+                                user_data.update(user_doc.to_dict())
+                        except Exception as e:
+                            st.error(f"Error retrieving user data: {e}")
+                    
+                    st.session_state["user"] = user_data
                     st.session_state["page"] = "home"  # Navigate to home page after login
                     st.session_state["show_balloons"] = True  # Flag to show balloons
                     st.rerun()
@@ -228,23 +268,58 @@ elif st.session_state["page"] == "home":
         
     st.title("Welcome to Home Page")
     
-    # Display logged-in user's email
+    # Display logged-in user's name or email
     if st.session_state["user"]:
-        st.write(f"👋 Welcome, {st.session_state['user']['email']}")
+        user_name = st.session_state["user"].get("first_name", st.session_state["user"]["email"])
+        st.write(f"👋 Welcome, {user_name}")
     
     # Retrieve and display the logged-in user's information in the sidebar
     if st.session_state["user"]:
         user_email = st.session_state["user"]["email"]
-        # Query the Firestore collection for the current user by email
-        user_docs = db.collection("users").where("email", "==", user_email).stream()
-        with st.sidebar:
-            st.header("Student Profile")
+        
+        # Query Firestore to get user details
+        # First check if we already have user details in session
+        if "profile_image" in st.session_state["user"]:
+            user_info = st.session_state["user"]
+            has_user_info = True
+        else:
+            # Query the user from Firestore by email
+            user_docs = db.collection("users").where("email", "==", user_email).limit(1).stream()
+            user_info = None
             for doc in user_docs:
                 user_info = doc.to_dict()
-                st.write(f"**Email:** {user_info.get('email', '')}")
-                st.write(f"**Name:** {user_info.get('first_name', '')} {user_info.get('middle_name', '')} {user_info.get('last_name', '')}")
-                st.write(f"PRN number: {user_info.get('prn_no', '')}")
-                # You can add more fields as needed
+                # Update session state with user details for future use
+                st.session_state["user"].update(user_info)
+                break
+                
+            has_user_info = user_info is not None
+        
+        # Display user profile in sidebar
+        with st.sidebar:
+            st.header("Student Profile")
+            
+            # Display profile image at the top of sidebar if available
+            if has_user_info and "profile_image" in user_info:
+                try:
+                    # Decode the base64 string to display the image
+                    img_data = user_info["profile_image"]
+                    # Use HTML for reliable image display from base64
+                    st.markdown(f"""
+                    <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                        <img src="data:image/jpeg;base64,{img_data}" 
+                            style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                    </div>
+                    """, unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"Error displaying profile image: {str(e)}")
+            
+            # Display user details
+            if has_user_info:
+                name = f"{user_info.get('first_name', '')} {user_info.get('middle_name', '')} {user_info.get('last_name', '')}"
+                st.markdown(f"**Name:** {name}")
+                st.markdown(f"**Email:** {user_info.get('email', '')}")
+                st.markdown(f"**PRN Number:** {user_info.get('prn_no', '')}")
+                st.markdown(f"**Batch:** {user_info.get('year_of_admission', '')}-{user_info.get('year_of_graduation', '')}")
         
         # Button to show image uploader
         if st.button("Upload the Image"):
@@ -259,7 +334,7 @@ elif st.session_state["page"] == "home":
                     image = Image.open(uploaded_file)
                     
                     # Optionally, display the uploaded image
-                    st.image(image, caption="Uploaded Image", use_column_width=True)
+                    st.image(image, caption="Uploaded Image", use_container_width=True)
                     
                     # Process the image and predict the person's name using the imported classifier function.
                     with st.spinner("Processing image and predicting..."):
