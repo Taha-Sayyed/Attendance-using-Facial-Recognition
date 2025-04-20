@@ -327,30 +327,6 @@ elif st.session_state["page"] == "home":
                 st.markdown(f"**Batch:** {user_info.get('year_of_admission', '')}-{user_info.get('year_of_graduation', '')}")
                 st.markdown(f"**Branch:** {user_info.get('branch', '')}")
         
-        # Button to show image uploader
-        if st.button("Upload the Image"):
-            st.session_state["upload_active"] = True
-        
-        # If the user has activated image uploading, show the file uploader widget
-        if st.session_state.get("upload_active"):
-            uploaded_file = st.file_uploader("Choose an image file", type=["png", "jpg", "jpeg"])
-            if uploaded_file is not None:
-                try:
-                    # Open the image using PIL
-                    image = Image.open(uploaded_file)
-                    
-                    # Optionally, display the uploaded image
-                    st.image(image, caption="Uploaded Image", use_container_width=True)
-                    
-                    # Process the image and predict the person's name using the imported classifier function.
-                    with st.spinner("Processing image and predicting..."):
-                        predicted_name = predict_person(image)
-                        
-                    st.success(f"Predicted Name: {predicted_name}")
-                except Exception as e:
-                    st.error("An error occurred during processing. Please try again.")
-                    st.error(str(e))
-        
         # New attendance button to start live video stream
         if st.button("Mark my attendance"):     
             st.session_state["mark_attendance_active"] = True
