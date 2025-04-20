@@ -1,4 +1,5 @@
 streamlit
+streamlit_webrtc
 firebase-admin
 python-dotenv
 requests
