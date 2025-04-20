@@ -70,7 +70,7 @@ def create_user(email, password, first_name, middle_name, last_name, prn_no, pho
                 "parent_phone_number": parent_phone_number
             }
             db.collection("users").document(uid).set(user_doc)
-            return f"User {email} created successfully! ✅ (UID: {uid})"
+            return f"Account for {email} created successfully! ✅"
 
         except Exception as e:
             return f"Firestore Error: {e}"
@@ -138,51 +138,53 @@ elif st.session_state["page"] == "Register":
     st.warning("Register with a valid Email ID for future updates.")
     st.button("Back to main page", on_click=lambda: navigate("main"))
 
-    # Registration form UI
-    email = st.text_input("Enter Email")
-    password = st.text_input("Enter Password", type="password")
-    first_name = st.text_input("Enter the First Name")
-    middle_name = st.text_input("Enter the Middle Name")
-    last_name = st.text_input("Enter the Last Name")
-    prn_no = st.text_input("Enter PRN Number")
-    phone_number = st.text_input("Enter Phone Number")
+    # Registration form using Streamlit form for proper Enter key handling
+    with st.form(key="registration_form"):
+        email = st.text_input("Enter Email")
+        password = st.text_input("Enter Password", type="password")
+        first_name = st.text_input("Enter the First Name")
+        middle_name = st.text_input("Enter the Middle Name")
+        last_name = st.text_input("Enter the Last Name")
+        prn_no = st.text_input("Enter PRN Number")
+        phone_number = st.text_input("Enter Phone Number")
 
-    # Create a list of years for admission/graduation
-    years = list(range(2020, 2031))
-    year_of_admission = st.selectbox("Select Year of Admission", years)
+        # Create a list of years for admission/graduation
+        years = list(range(2020, 2031))
+        year_of_admission = st.selectbox("Select Year of Admission", years)
 
-    # Ensure graduation year is after admission year
-    if year_of_admission:
-        graduation_years = [y for y in years if y >= year_of_admission]
-        year_of_graduation = st.selectbox("Select Year of Graduation", graduation_years)
-    else:
-        year_of_graduation = st.selectbox("Select Year of Graduation", years)
-
-    default_date = date(2000, 1, 1)
-    birth_date = st.date_input("Select Your Birth Date", min_value=date(1995, 1, 1), 
-                               max_value=date.today(), value=default_date)
-
-    parent_name = st.text_input("Enter Parent Name")
-    parent_phone_number = st.text_input("Enter Parent Phone Number")
-
-    # 🔹 Register Button
-    if st.button("Register"):
-        # Check if any field is empty
-        if not all([email, password, first_name, middle_name, last_name, prn_no, phone_number, parent_name, parent_phone_number]):
-            st.error("Error: Please fill in all the fields.")
+        # Ensure graduation year is after admission year
+        if year_of_admission:
+            graduation_years = [y for y in years if y >= year_of_admission]
+            year_of_graduation = st.selectbox("Select Year of Graduation", graduation_years)
         else:
-            result = create_user(
-                email, password, first_name, middle_name, last_name, 
-                prn_no, phone_number, year_of_admission, year_of_graduation, 
-                birth_date, parent_name, parent_phone_number
-            )
-            st.write(result)
-            time.sleep(3)
-            st.session_state["page"]="main"
-            st.rerun()
+            year_of_graduation = st.selectbox("Select Year of Graduation", years)
 
-    
+        default_date = date(2000, 1, 1)
+        birth_date = st.date_input("Select Your Birth Date", min_value=date(1995, 1, 1), 
+                                max_value=date.today(), value=default_date)
+
+        parent_name = st.text_input("Enter Parent Name")
+        parent_phone_number = st.text_input("Enter Parent Phone Number")
+
+        # 🔹 Register Submit Button (works with Enter key too)
+        submit_button = st.form_submit_button(label="Register")
         
+        if submit_button:
+            # Check if any field is empty
+            if not all([email, password, first_name, middle_name, last_name, prn_no, phone_number, parent_name, parent_phone_number]):
+                st.error("Error: Please fill in all the fields.")
+            else:
+                result = create_user(
+                    email, password, first_name, middle_name, last_name, 
+                    prn_no, phone_number, year_of_admission, year_of_graduation, 
+                    birth_date, parent_name, parent_phone_number
+                )
+                st.write(result)
+                if "successfully" in result:
+                    st.balloons()  # Show balloons on successful registration
+                    time.sleep(3)
+                    st.session_state["page"] = "main"
+                    st.rerun()
 
 elif st.session_state["page"] == "Login":
     st.title("Welcome to Login Page")
