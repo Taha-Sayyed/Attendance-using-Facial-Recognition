@@ -25,14 +25,6 @@ from PIL import Image
 # Import your classifier prediction function (assuming this function is defined in classifier_model_for_testing.py)
 from classifier_model_for_testing import predict_person  # This function should encapsulate all pre-processing steps as in your classifier code
 
-# Import face anti-spoofing tools with error handling
-try:
-    from Testing.model_utils import FaceAntiSpoofModel, detect_face
-    ANTI_SPOOFING_AVAILABLE = True
-except ImportError:
-    st.warning("Face anti-spoofing module could not be imported. Will run without anti-spoofing checks.")
-    ANTI_SPOOFING_AVAILABLE = False
-
 # Load API Key from .env file
 load_dotenv()
 api_key = os.getenv('API_KEY')
@@ -127,15 +119,10 @@ class FaceDetectionTransformer(VideoTransformerBase):
     def __init__(self):
         self.current_prediction = "No face detected"
         self.all_predictions = []
-        self.current_frame = None  # Store the current frame for anti-spoofing
     
     def transform(self, frame: av.VideoFrame) -> np.ndarray:
         # Get frame as numpy array in BGR format
         img = frame.to_ndarray(format="bgr24")
-        
-        # Store the current frame for anti-spoofing
-        self.current_frame = img.copy()
-        
         # Convert to PIL image (RGB) for classifier input
         pil_img = Image.fromarray(cv.cvtColor(img, cv.COLOR_BGR2RGB))
         
@@ -463,9 +450,8 @@ elif st.session_state["page"] == "home":
                         col1, col2, col3 = st.columns([1, 2, 1])
                         with col2:
                             if st.button("Submit Attendance", use_container_width=True, type="primary"):
-                                # Get all predictions and current frame from the transformer
+                                # Get all predictions from the transformer
                                 all_predictions = webrtc_ctx.video_processor.all_predictions
-                                current_frame = webrtc_ctx.video_processor.current_frame
                                 
                                 # Create the full name of the logged-in user
                                 if st.session_state["user"]:
@@ -480,82 +466,20 @@ elif st.session_state["page"] == "home":
                                     elif user_full_name not in all_predictions:
                                         st.error(f"Your face was not recognized. Only {user_full_name} can mark attendance with this account.")
                                     else:
-                                        # User's face is recognized - now check if it's real
-                                        with st.spinner("Verifying face authenticity..."):
-                                            if ANTI_SPOOFING_AVAILABLE and current_frame is not None:
-                                                try:
-                                                    # Print debugging info about the current frame
-                                                    st.write(f"Frame shape: {current_frame.shape if current_frame is not None else 'None'}")
-                                                    
-                                                    # Detect face in the frame for anti-spoofing check
-                                                    from Testing.model_utils import detect_face
-                                                    _, face_roi = detect_face(current_frame)
-                                                    
-                                                    if face_roi is not None:
-                                                        # Show the extracted face for debugging
-                                                        st.write(f"Face ROI shape: {face_roi.shape}")
-                                                        
-                                                        # Resize face ROI to 96x96 as required by anti-spoofing model
-                                                        face_roi_resized = cv.resize(face_roi, (96, 96))
-                                                        
-                                                        # Initialize the model directly here for safety
-                                                        # Make sure we're using the Testing.model_utils FaceAntiSpoofModel
-                                                        from Testing.model_utils import FaceAntiSpoofModel
-                                                        
-                                                        # Use the best model from the model_checkpoints directory
-                                                        model_path = "model_checkpoints/model.08-1.00.keras"
-                                                        st.write(f"Loading model from: {model_path}")
-                                                        anti_spoof_model = FaceAntiSpoofModel(model_path)
-                                                        
-                                                        # Predict whether the face is real or fake
-                                                        spoof_label, spoof_confidence = anti_spoof_model.predict(face_roi_resized)
-                                                        
-                                                        # Show anti-spoofing results on the screen
-                                                        if spoof_label == "REAL":
-                                                            st.success(f"Face verified as REAL with {spoof_confidence:.2f} confidence")
-                                                            
-                                                            # Mark attendance since face is real
-                                                            st.success(f"{user_full_name} has been marked present!")
-                                                            
-                                                            try:
-                                                                # Add attendance record to Firestore
-                                                                attendance_data = {
-                                                                    "user_email": st.session_state["user"]["email"],
-                                                                    "name": user_full_name,
-                                                                    "timestamp": firestore.SERVER_TIMESTAMP,
-                                                                    "spoof_check": "REAL",
-                                                                    "spoof_confidence": float(spoof_confidence)
-                                                                }
-                                                                db.collection("attendance").add(attendance_data)
-                                                                st.info("Attendance recorded successfully in the database.")
-                                                                
-                                                                # Show balloons animation for success
-                                                                st.balloons()
-                                                            except Exception as e:
-                                                                st.warning(f"Could not record attendance in database: {e}")
-                                                        else:
-                                                            # Face is fake - display warning
-                                                            st.error(f"Warning: Face is FAKE with {spoof_confidence:.2f} confidence")
-                                                            st.warning("Attendance not marked. Please try again with your real face.")
-                                                    else:
-                                                        st.error("Could not detect a face clearly for anti-spoofing check.")
-                                                        # Fallback to regular attendance
-                                                        mark_regular_attendance(user_full_name, st.session_state["user"]["email"])
-                                                except Exception as e:
-                                                    st.error(f"Error in face verification: {e}")
-                                                    # Show exception details for debugging
-                                                    st.exception(e)
-                                                    # Fallback to regular attendance if face verification fails
-                                                    st.warning("Face verification failed. Proceeding with regular attendance.")
-                                                    mark_regular_attendance(user_full_name, st.session_state["user"]["email"])
-                                            else:
-                                                # Anti-spoofing not available or no frame captured
-                                                if not ANTI_SPOOFING_AVAILABLE:
-                                                    st.warning("Face anti-spoofing is not available. Proceeding with regular attendance.")
-                                                else:
-                                                    st.error("No frame captured for anti-spoofing verification.")
-                                                # Mark attendance without anti-spoofing
-                                                mark_regular_attendance(user_full_name, st.session_state["user"]["email"])
+                                        # User's face is recognized - mark attendance
+                                        st.success(f"{user_full_name} has been marked present!")
+                                        
+                                        try:
+                                            # Add attendance record to Firestore
+                                            attendance_data = {
+                                                "user_email": st.session_state["user"]["email"],
+                                                "name": user_full_name,
+                                                "timestamp": firestore.SERVER_TIMESTAMP
+                                            }
+                                            db.collection("attendance").add(attendance_data)
+                                            st.info("Attendance recorded successfully in the database.")
+                                        except Exception as e:
+                                            st.warning(f"Could not record attendance in database: {e}")
                                         
                                         # Reset the mark_attendance_active flag to stop the video stream
                                         st.session_state["mark_attendance_active"] = False
@@ -706,26 +630,4 @@ elif st.session_state["page"] == "home":
                         """)
                 else:
                     st.error("User information not available. Please log in again.")
-
-# Helper function to mark attendance when anti-spoofing fails
-def mark_regular_attendance(user_full_name, user_email):
-    try:
-        # Add attendance record to Firestore without anti-spoofing data
-        attendance_data = {
-            "user_email": user_email,
-            "name": user_full_name,
-            "timestamp": firestore.SERVER_TIMESTAMP,
-            "spoof_check": "UNKNOWN",  # Indicating anti-spoofing was not performed
-        }
-        db.collection("attendance").add(attendance_data)
-        st.success(f"{user_full_name} has been marked present!")
-        st.info("Attendance recorded successfully in the database.")
-        
-        # Show balloons animation for success
-        st.balloons()
-        return True
-    except Exception as e:
-        st.warning(f"Could not record attendance in database: {e}")
-        return False
-
 #Logic added By Taha Sayyed --------------------------------------------------------------------------
