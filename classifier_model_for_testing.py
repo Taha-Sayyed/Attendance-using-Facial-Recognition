@@ -144,3 +144,4 @@ def predict_person(pil_image):
     
     annotated_image = Image.fromarray(image_np)
     return annotated_image
+
