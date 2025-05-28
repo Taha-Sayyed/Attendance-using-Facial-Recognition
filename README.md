@@ -35,6 +35,7 @@ The proposed end-to-end attendance system consists of three main components:
 - The software allows splitting the dataset into **training and testing sets**.
 - **FaceNet** with **Inception ResNetV1** (pre-trained on **VGGFace2**) is re-trained until accuracy exceeds **99%**.
 - ✅ The trained model is saved for future recognition tasks.
+- ![Image](https://github.com/user-attachments/assets/3debbe08-6b9f-418c-a74c-c56a4c15e4c4)
 
 ---
 
@@ -58,3 +59,7 @@ The proposed end-to-end attendance system consists of three main components:
 - ✅ Marks attendance for all recognized students automatically.
 
 ---
+### 4. 🎥 Final Output
+https://github.com/user-attachments/assets/f00239bf-abca-4b1d-a81f-2a99ec4e913a
+
+https://github.com/user-attachments/assets/e97e40d8-4db5-4e4a-9f07-1862df667b34
